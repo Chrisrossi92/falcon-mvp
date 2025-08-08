@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import App from './App';
 import DashboardPage from './features/dashboard/DashboardPage';
-import OrdersListView from './features/orders-list/OrdersListView';
+import OrdersListMvp from './features/orders-list/OrdersListMvp';
 import OrderDetailPage from './features/order-detail/OrderDetailPage';
 import ClientsListPage from './features/clients/ClientsListPage';
 import ClientProfilePage from './features/clients/ClientProfilePage';
@@ -19,7 +19,7 @@ const RoutesConfig: React.FC = () => (
     <Routes>
       <Route path="/" element={<App />}>
         <Route index element={<DashboardPage />} />
-        <Route path="orders" element={<OrdersListView />} />
+        <Route path="orders" element={<OrdersListMVP />} />
         <Route path="orders/:id" element={<OrderDetailPage />} />
         <Route path="clients" element={<ClientsListPage />} />
         <Route path="clients/:id" element={<ClientProfilePage />} />
