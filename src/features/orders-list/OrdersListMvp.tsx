@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Order } from "../../entities/order/types";
 import { getOrders } from "../../entities/order/api";
+import OrdersFilterBar from "./OrdersFilterBar";
 
 interface SavedView {
   name: string;
@@ -30,20 +31,50 @@ const SAVED_VIEWS_KEY = "orders-list-mvp-saved-views";
 
 const OrdersListMvp: React.FC = () => {
   const navigate = useNavigate();
+
+  /**
+   * Determine an initial saved view from localStorage. If any saved views
+   * exist we take the most recently saved one (last in the array) and
+   * hydrate our local component state accordingly. This provides the
+   * "auto‑load on mount" behaviour required by the MVP.
+   */
+  const initialView: SavedView | null = (() => {
+    try {
+      const raw = localStorage.getItem(SAVED_VIEWS_KEY);
+      if (!raw) return null;
+      const parsed: SavedView[] = JSON.parse(raw);
+      return parsed.length > 0 ? parsed[parsed.length - 1] : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+
+  // initialize search and view parameters from the last saved view if available
+  const [search, setSearch] = useState(initialView?.search ?? "");
   const [visibleColumns, setVisibleColumns] = useState<(keyof Order)[]>(() =>
-    ALL_COLUMNS.map((c) => c.key)
+    initialView?.visibleColumns ?? ALL_COLUMNS.map((c) => c.key)
   );
-  const [sortKey, setSortKey] = useState<keyof Order>("id");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [sortKey, setSortKey] = useState<keyof Order>(
+    initialView?.sortKey ?? "id"
+  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
+    initialView?.sortOrder ?? "asc"
+  );
+  const [currentPage, setCurrentPage] = useState(
+    initialView?.page ?? 1
+  );
   const pageSize = 10;
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => {
-    const saved = localStorage.getItem(SAVED_VIEWS_KEY);
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem(SAVED_VIEWS_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -159,12 +190,8 @@ const OrdersListMvp: React.FC = () => {
   return (
     <div className="p-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-2 md:space-y-0">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search"
-          className="border p-2 rounded md:w-64"
-        />
+        {/* Reuse the existing OrdersFilterBar component for the search input */}
+        <OrdersFilterBar search={search} setSearch={setSearch} />
         <div className="flex space-x-2">
           <button
             onClick={handleSaveView}
