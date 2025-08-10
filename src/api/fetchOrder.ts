@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supbaseClient";
 
 export async function fetchOrder(orderId: string) {
   const { data, error } = await supabase
