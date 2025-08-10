@@ -1,34 +1,37 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import App from './App';
-import DashboardPage from './features/dashboard/DashboardPage';
-import OrdersListMvp from './features/orders-list/OrdersListMvp';
-import OrderDetailPage from './features/order-detail/OrderDetailPage';
-import ClientsListPage from './features/clients/ClientsListPage';
-import ClientProfilePage from './features/clients/ClientProfilePage';
-import ReportsPage from './features/reports/ReportsPage';
-import UsersPage from './features/users/UsersPage';
-import SettingsPage from './features/settings/SettingsPage';
+// src/routes.tsx
+import React, { Suspense, lazy } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 
-/**
- * Defines the router configuration for the application.
- * Uses react-router-dom to map routes to pages. Nested under the App shell for layout.
- */
-const RoutesConfig: React.FC = () => (
-  <BrowserRouter>
-    <Routes>
-      <Route path="/" element={<App />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="orders" element={<OrdersListMVP />} />
-        <Route path="orders/:id" element={<OrderDetailPage />} />
-        <Route path="clients" element={<ClientsListPage />} />
-        <Route path="clients/:id" element={<ClientProfilePage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-      </Route>
-    </Routes>
-  </BrowserRouter>
-);
+// Lazy-loaded pages (default exports expected)
+const OrdersListMvp   = lazy(() => import("@/features/orders-list/OrdersListMvp"));
+const OrderDetailPage = lazy(() => import("@/features/order-detail/OrderDetailPage"));
+const OrderCreatePage = lazy(() => import("@/features/order-create/OrderCreatePage"));
 
-export default RoutesConfig;
+// Optional route helpers for use elsewhere in the app
+export const ROUTES = {
+  orders: "/orders",
+  order: (id: string) => `/orders/${id}`,
+  newOrder: "/orders/new",
+};
+
+function NotFound() {
+  return <div className="p-6">Page not found.</div>;
+}
+
+function AppRoutes() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading…</div>}>
+      <Routes>
+        <Route path="/" element={<Navigate to={ROUTES.orders} replace />} />
+        <Route path={ROUTES.orders} element={<OrdersListMvp />} />
+        <Route path={ROUTES.newOrder} element={<OrderCreatePage />} />
+        <Route path="/orders/:id" element={<OrderDetailPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  );
+}
+
+export default AppRoutes;
+export { AppRoutes };
+
