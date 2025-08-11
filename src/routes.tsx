@@ -2,16 +2,18 @@
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-const OrdersListMvp   = lazy(() => import("@/features/orders-list/OrdersListMvp"));
-const OrderDetailPage = lazy(() => import("@/features/order-detail/OrderDetailPage"));
-const OrderCreatePage = lazy(() => import("@/features/order-create/OrderCreatePage"));
-const OrderAppointmentPage = lazy(() => import("@/features/order-appointment/OrderAppointmentPage"));
+const OrdersListMvp       = lazy(() => import("@/features/orders-list/OrdersListMvp"));
+const OrderDetailPage     = lazy(() => import("@/features/order-detail/OrderDetailPage"));
+const OrderCreatePage     = lazy(() => import("@/features/order-create/OrderCreatePage"));
+const OrderAppointmentPage= lazy(() => import("@/features/order-appointment/OrderAppointmentPage"));
+const ReportsPage         = lazy(() => import("@/features/reports/ReportsPage"));
 
 export const ROUTES = {
   orders: "/orders",
   order: (id: string) => `/orders/${id}`,
   newOrder: "/orders/new",
   appointment: (id: string) => `/orders/${id}/appointment`,
+  reports: "/reports",
 };
 
 function NotFound() {
@@ -27,6 +29,7 @@ function AppRoutes() {
         <Route path={ROUTES.newOrder} element={<OrderCreatePage />} />
         <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/orders/:id/appointment" element={<OrderAppointmentPage />} />
+        <Route path={ROUTES.reports} element={<ReportsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
@@ -35,5 +38,6 @@ function AppRoutes() {
 
 export default AppRoutes;
 export { AppRoutes };
+
 
 
