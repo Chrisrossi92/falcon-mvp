@@ -1,22 +1,23 @@
-import React from "react";
+import { Component, type ReactNode } from "react";
 
+type Props = { children: ReactNode };
 type State = { hasError: boolean; error?: unknown };
 
-export default class ErrorBoundary extends React.Component<React.PropsWithChildren, State> {
-  state: State = { hasError: false };
+export default class ErrorBoundary extends Component<Props, State> {
+  state: State = { hasError: false, error: undefined };
 
-  static getDerivedStateFromError(error: unknown) {
+  static getDerivedStateFromError(error: unknown): State {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: unknown, info: unknown) {
-    // visible in devtools
+    // Visible in browser devtools
     console.error("App error:", error, info);
   }
 
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
-      const err = this.state.error as any;
+      const err: any = this.state.error;
       return (
         <div style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
           <h1>Something broke.</h1>
@@ -27,11 +28,8 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
         </div>
       );
     }
-    return this.props.children as any;
+    return this.props.children;
   }
 }
 
-    return this.props.children as any;
-  }
-}
 
