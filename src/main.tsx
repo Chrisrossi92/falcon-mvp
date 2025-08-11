@@ -1,12 +1,19 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 
+function App() {
+  return <div style={{ padding: 16 }}>Router shell OK</div>;
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <div style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
-    <h1>Hello Falcon</h1>
-    <p>If you see this, the app is mounting correctly.</p>
-  </div>
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>
 );
+
 
 
