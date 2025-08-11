@@ -8,6 +8,7 @@ const OrderCreatePage      = lazy(() => import("@/features/order-create/OrderCre
 const OrderAppointmentPage = lazy(() => import("@/features/order-appointment/OrderAppointmentPage"));
 const ReportsPage          = lazy(() => import("@/features/reports/ReportsPage"));
 const NotificationsHost    = lazy(() => import("@/features/notifications/NotificationsHost"));
+const PreferencesPage      = lazy(() => import("@/features/settings/PreferencesPage"));
 
 export const ROUTES = {
   orders: "/orders",
@@ -15,6 +16,7 @@ export const ROUTES = {
   newOrder: "/orders/new",
   appointment: (id: string) => `/orders/${id}/appointment`,
   reports: "/reports",
+  settings: "/settings",
 };
 
 function NotFound() {
@@ -32,6 +34,7 @@ function AppRoutes() {
         <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/orders/:id/appointment" element={<OrderAppointmentPage />} />
         <Route path={ROUTES.reports} element={<ReportsPage />} />
+        <Route path={ROUTES.settings} element={<PreferencesPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
@@ -40,6 +43,7 @@ function AppRoutes() {
 
 export default AppRoutes;
 export { AppRoutes };
+
 
 
 
