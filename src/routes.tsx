@@ -2,6 +2,12 @@
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import CommandPalette from "@/features/command/CommandPalette";
+
+<>
+  <CommandPalette />
+  {/* existing router / layout JSX */}
+</>
 
 const OrdersListMvp        = lazy(() => import("@/features/orders-list/OrdersListMvp"));
 const OrderDetailPage      = lazy(() => import("@/features/order-detail/OrderDetailPage"));
