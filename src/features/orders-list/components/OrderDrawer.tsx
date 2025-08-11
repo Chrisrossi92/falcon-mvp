@@ -5,44 +5,120 @@ import { supabase } from "@/lib/supabaseClient";
 import ActivityTimeline from "./panels/ActivityTimeline";
 import OrderMap from "./panels/OrderMap";
 import NotesPanel from "./panels/NotesPanel";
+import { assignOrder } from "@/api/assignOrder";
+import { setOrderStatus } from "@/api/setOrderStatus";
+import { listUsers } from "@/api/listUsers";
 
 type Props = {
   orderId: string;
   onClose: () => void;
-  onUpdated?: () => void; // call after actions: assign, status change, note, etc.
+  onUpdated?: () => void; // call after actions
 };
 
 type TabKey = "timeline" | "map" | "notes";
 
-export default function OrderDrawer({ orderId, onClose }: Props) {
+export default function OrderDrawer({ orderId, onClose, onUpdated }: Props) {
   const [tab, setTab] = useState<TabKey>("timeline");
   const [order, setOrder] = useState<OrderView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<{ id: string; full_name: string | null }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("v_orders")
-        .select("*")
-        .eq("id", orderId)
-        .maybeSingle();
-      if (!alive) return;
-      if (error) console.error(error);
+  async function load() {
+    setLoading(true);
+    setErr(null);
+    const { data, error } = await supabase
+      .from("v_orders")
+      .select("*")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (error) {
+      setErr(error.message);
+      setOrder(null);
+    } else {
       setOrder((data as any) ?? null);
-      setLoading(false);
-    })();
-    return () => { alive = false; };
-  }, [orderId]);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, [orderId]);
+  useEffect(() => { listUsers(100).then(setUsers).catch(() => {}); }, []);
+
+  async function onAssign(userId: string | null) {
+    if (!order) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await assignOrder(order.id, userId);
+      await load();
+      onUpdated?.();
+    } catch (e: any) {
+      setErr(e?.message ?? "Failed to assign");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onStatus(next: "new" | "in_review" | "completed" | "cancelled") {
+    if (!order) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await setOrderStatus({ orderId: order.id, newStatus: next });
+      await load();
+      onUpdated?.();
+    } catch (e: any) {
+      setErr(e?.message ?? "Failed to update status");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <aside style={drawer}>
       <div style={drawerHeader}>
-        <strong>Order {orderId}</strong>
-        <button onClick={onClose} style={closeBtn}>×</button>
+        <div>
+          <strong>Order {orderId}</strong>
+          {order?.title ? <span style={{ marginLeft: 6, color: "#666" }}>· {order.title}</span> : null}
+        </div>
+        <button onClick={onClose} style={closeBtn} title="Close">×</button>
       </div>
 
+      {/* Quick actions */}
+      <div style={{ padding: 12, borderBottom: "1px solid #eee", display: "flex", gap: 8, alignItems: "center" }}>
+        {/* Assign */}
+        <label style={{ fontSize: 12, color: "#666" }}>Assign:</label>
+        <select
+          disabled={busy || loading}
+          value={order?.assigned_to ?? ""}
+          onChange={(e) => onAssign(e.target.value || null)}
+          style={select}
+        >
+          <option value="">Unassigned</option>
+          {users.map(u => (
+            <option key={u.id} value={u.id}>{u.full_name ?? "(no name)"}</option>
+          ))}
+        </select>
+
+        {/* Status */}
+        <label style={{ fontSize: 12, color: "#666", marginLeft: 8 }}>Status:</label>
+        <select
+          disabled={busy || loading}
+          value={order?.status ?? "new"}
+          onChange={(e) => onStatus(e.target.value as any)}
+          style={select}
+        >
+          <option value="new">New</option>
+          <option value="in_review">In Review</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+
+        {err && <span style={{ color: "#a00", marginLeft: 8, fontSize: 12 }}>Error: {err}</span>}
+      </div>
+
+      {/* Tabs */}
       <div style={{ padding: 12, borderBottom: "1px solid #eee" }}>
         <nav style={{ display: "flex", gap: 8 }}>
           {(["timeline","map","notes"] as TabKey[]).map(k => (
@@ -57,6 +133,7 @@ export default function OrderDrawer({ orderId, onClose }: Props) {
         </nav>
       </div>
 
+      {/* Content */}
       <div style={{ padding: 12, overflow: "auto" }}>
         {loading && <div>Loading…</div>}
         {!loading && !order && <div>Not found.</div>}
@@ -64,7 +141,7 @@ export default function OrderDrawer({ orderId, onClose }: Props) {
           <>
             {tab === "timeline" && <ActivityTimeline orderId={orderId} />}
             {tab === "map" && <OrderMap order={order} />}
-            {tab === "notes" && <NotesPanel orderId={orderId} />}
+            {tab === "notes" && <NotesPanel orderId={orderId} onAdded={() => {/* Activity tab will auto-refresh */}} />}
           </>
         )}
       </div>
@@ -102,6 +179,13 @@ const closeBtn: React.CSSProperties = {
   cursor: "pointer",
 };
 
+const select: React.CSSProperties = {
+  border: "1px solid #ddd",
+  borderRadius: 8,
+  padding: "6px 8px",
+  background: "#fff",
+};
+
 const tabBtn = (active: boolean): React.CSSProperties => ({
   padding: "6px 10px",
   borderRadius: 8,
@@ -110,3 +194,4 @@ const tabBtn = (active: boolean): React.CSSProperties => ({
   cursor: "pointer",
   textTransform: "capitalize",
 });
+
