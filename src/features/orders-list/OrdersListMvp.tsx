@@ -3,6 +3,8 @@ import { useSearchParams } from "react-router-dom";
 import OrdersFilterBar from "./OrdersFilterBar";
 import { fetchOrders, OrderFilters, OrderRow } from "@/api/fetchOrders";
 import OrdersTable from "./OrdersTable";
+import { listUsers, UserOpt } from "@/api/listUsers";
+import { bulkAssignOrders } from "@/api/bulkAssignOrders";
 
 function paramsToFilters(sp: URLSearchParams): OrderFilters {
   const status = sp.getAll("status") as OrderFilters["status"];
@@ -39,11 +41,23 @@ export default function OrdersListMvp() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const [users, setUsers] = useState<UserOpt[]>([]);
+  const [assignTo, setAssignTo] = useState<string>("");
+  const [assigning, setAssigning] = useState(false);
+
+  // selection state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
   const filters = useMemo(() => paramsToFilters(searchParams), [searchParams]);
+
+  useEffect(() => {
+    listUsers().then(setUsers).catch(console.error);
+  }, []);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    setSelected(new Set()); // clear selection on filter change/page change
     fetchOrders(filters)
       .then(({ rows, total }) => { if (!alive) return; setRows(rows); setTotal(total); })
       .finally(() => { if (alive) setLoading(false); });
@@ -59,22 +73,92 @@ export default function OrdersListMvp() {
   const pageSize = filters.pageSize ?? 20;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
+  const toggleOne = (id: string) => {
+    const s = new Set(selected);
+    s.has(id) ? s.delete(id) : s.add(id);
+    setSelected(s);
+  };
+
+  const toggleAllOnPage = (idsOnPage: string[]) => {
+    const allSelected = idsOnPage.every(id => selected.has(id));
+    const s = new Set(selected);
+    if (allSelected) {
+      idsOnPage.forEach(id => s.delete(id));
+    } else {
+      idsOnPage.forEach(id => s.add(id));
+    }
+    setSelected(s);
+  };
+
+  async function doBulkAssign() {
+    if (!assignTo || selected.size === 0) return;
+    setAssigning(true);
+    try {
+      const count = await bulkAssignOrders(Array.from(selected), assignTo);
+      // refetch current page
+      fetchOrders(filters).then(({ rows, total }) => { setRows(rows); setTotal(total); });
+      setSelected(new Set());
+      alert(`Assigned ${count} orders.`);
+    } catch (e: any) {
+      alert(e?.message ?? "Bulk assign failed");
+    } finally {
+      setAssigning(false);
+    }
+  }
+
   return (
-    <div className="p-4">
+    <div className="p-4 space-y-3">
       <OrdersFilterBar value={filters} onChange={onChangeFilters} />
+
+      {/* Bulk bar */}
+      <div className="flex items-center gap-3">
+        <div className="text-sm">
+          Selected: <strong>{selected.size}</strong>
+        </div>
+        <select
+          className="border rounded px-2 py-1"
+          value={assignTo}
+          onChange={(e) => setAssignTo(e.target.value)}
+        >
+          <option value="">Assign to…</option>
+          {users.map(u => (
+            <option key={u.id} value={u.id}>{u.full_name ?? "Unnamed"}</option>
+          ))}
+        </select>
+        <button
+          className="px-3 py-1 border rounded bg-black text-white disabled:opacity-50"
+          disabled={!assignTo || selected.size === 0 || assigning}
+          onClick={doBulkAssign}
+        >
+          {assigning ? "Assigning…" : "Bulk Assign"}
+        </button>
+      </div>
+
       {loading ? (
         <div>Loading…</div>
       ) : (
         <>
-          <OrdersTable orders={rows} />
+          <OrdersTable
+            orders={rows}
+            selectable
+            selectedIds={selected}
+            onToggle={toggleOne}
+            onToggleAll={toggleAllOnPage}
+          />
           <div className="flex items-center gap-3 mt-4">
-            <button className="px-2 py-1 border rounded" disabled={page <= 1}
-              onClick={() => setSearchParams(filtersToParams({ ...filters, page: page - 1 }), { replace: true })}>
+            <button
+              className="px-2 py-1 border rounded"
+              disabled={page <= 1}
+              onClick={() => setSearchParams(filtersToParams({ ...filters, page: page - 1 }), { replace: true })}
+            >
               Prev
             </button>
             <span className="text-sm">Page {page} / {pageCount}</span>
-            <button className="px-2 py-1 border rounded" disabled={page >= pageCount}
-              onClick={() => setSearchParams(filtersToParams({ ...filters, page: page + 1 }), { replace: true })}>
+            <button
+              className="px-2 py-1 border rounded"
+              disabled={page >= pageCount}
+              onClick={() => setSearchParams(filtersToParams({ ...filters, page: page + 1 }), { replace: true })}
+            >
               Next
             </button>
           </div>
@@ -84,7 +168,4 @@ export default function OrdersListMvp() {
   );
 }
 
-    </div>
-  );
-}
 
