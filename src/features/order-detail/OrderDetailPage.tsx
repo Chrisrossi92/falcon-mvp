@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchOrder } from "@/api/fetchOrder";
 import { archiveOrder } from "@/api/archiveOrder";
+import OrderFilesPanel from "./OrderFilesPanel";
 
 // Be compatible with either default or named exports
 import * as ActivityTimelineMod from "./ActivityTimeline";
@@ -153,9 +154,10 @@ export default function OrderDetailPage() {
 
       {/* Timeline + Note composer */}
       <section className="space-y-4">
-        {ActivityTimeline ? <ActivityTimeline orderId={order.id} /> : null}
-        {NoteComposer ? <NoteComposer orderId={order.id} /> : null}
-      </section>
+  {ActivityTimeline ? <ActivityTimeline orderId={order.id} /> : null}
+  {NoteComposer ? <NoteComposer orderId={order.id} /> : null}
+  <OrderFilesPanel orderId={order.id} />
+</section>
     </div>
   );
 }
