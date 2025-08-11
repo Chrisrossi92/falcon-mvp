@@ -4,19 +4,19 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import CommandPalette from "@/features/command/CommandPalette";
 
-<>
-  <CommandPalette />
-  {/* existing router / layout JSX */}
-</>
+// Helper to tolerate either default or named export (safer with lazy)
+const lazyDefault = <T extends object>(p: Promise<T>, key?: keyof T) =>
+  p.then((m: any) => ({ default: (m.default ?? (key ? m[key as string] : undefined)) as React.ComponentType }));
 
-const OrdersListMvp        = lazy(() => import("@/features/orders-list/OrdersListMvp"));
-const OrderDetailPage      = lazy(() => import("@/features/order-detail/OrderDetailPage"));
-const OrderCreatePage      = lazy(() => import("@/features/order-create/OrderCreatePage"));
-const OrderAppointmentPage = lazy(() => import("@/features/order-appointment/OrderAppointmentPage"));
-const ReportsPage          = lazy(() => import("@/features/reports/ReportsPage"));
-const PreferencesPage      = lazy(() => import("@/features/settings/PreferencesPage"));
-const NotificationsHost    = lazy(() => import("@/features/notifications/NotificationsHost"));
-const KanbanBoardPage      = lazy(() => import("@/features/kanban/KanbanBoardPage"));
+const OrdersListMvp        = lazy(() => lazyDefault(import("@/features/orders-list/OrdersListMvp")));
+const OrderDetailPage      = lazy(() => lazyDefault(import("@/features/order-detail/OrderDetailPage")));
+const OrderCreatePage      = lazy(() => lazyDefault(import("@/features/order-create/OrderCreatePage")));
+const OrderAppointmentPage = lazy(() => lazyDefault(import("@/features/order-appointment/OrderAppointmentPage")));
+const ReportsPage          = lazy(() => lazyDefault(import("@/features/reports/ReportsPage")));
+const PreferencesPage      = lazy(() => lazyDefault(import("@/features/settings/PreferencesPage")));
+// If NotificationsHost was a named export, the helper above would still work,
+// but to isolate crashes we’ll disable it for one deploy and re-enable after.
+const KanbanBoardPage      = lazy(() => lazyDefault(import("@/features/kanban/KanbanBoardPage")));
 
 export const ROUTES = {
   orders: "/orders",
@@ -35,8 +35,10 @@ function NotFound() {
 function AppRoutes() {
   return (
     <ErrorBoundary>
+      <CommandPalette /> {/* ← mount inside the tree */}
       <Suspense fallback={<div className="p-6">Loading…</div>}>
-        <NotificationsHost />
+        {/* Temporarily comment out NotificationsHost to isolate crashes */}
+        {/* <NotificationsHost /> */}
         <Routes>
           <Route path="/" element={<Navigate to={ROUTES.orders} replace />} />
           <Route path={ROUTES.orders} element={<OrdersListMvp />} />
@@ -55,6 +57,7 @@ function AppRoutes() {
 
 export default AppRoutes;
 export { AppRoutes };
+
 
 
 
