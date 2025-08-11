@@ -2,11 +2,12 @@
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-const OrdersListMvp       = lazy(() => import("@/features/orders-list/OrdersListMvp"));
-const OrderDetailPage     = lazy(() => import("@/features/order-detail/OrderDetailPage"));
-const OrderCreatePage     = lazy(() => import("@/features/order-create/OrderCreatePage"));
-const OrderAppointmentPage= lazy(() => import("@/features/order-appointment/OrderAppointmentPage"));
-const ReportsPage         = lazy(() => import("@/features/reports/ReportsPage"));
+const OrdersListMvp        = lazy(() => import("@/features/orders-list/OrdersListMvp"));
+const OrderDetailPage      = lazy(() => import("@/features/order-detail/OrderDetailPage"));
+const OrderCreatePage      = lazy(() => import("@/features/order-create/OrderCreatePage"));
+const OrderAppointmentPage = lazy(() => import("@/features/order-appointment/OrderAppointmentPage"));
+const ReportsPage          = lazy(() => import("@/features/reports/ReportsPage"));
+const NotificationsHost    = lazy(() => import("@/features/notifications/NotificationsHost"));
 
 export const ROUTES = {
   orders: "/orders",
@@ -23,6 +24,7 @@ function NotFound() {
 function AppRoutes() {
   return (
     <Suspense fallback={<div className="p-6">Loading…</div>}>
+      <NotificationsHost />
       <Routes>
         <Route path="/" element={<Navigate to={ROUTES.orders} replace />} />
         <Route path={ROUTES.orders} element={<OrdersListMvp />} />
@@ -38,6 +40,7 @@ function AppRoutes() {
 
 export default AppRoutes;
 export { AppRoutes };
+
 
 
 
