@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchOrder } from "@/api/fetchOrder";
 import { archiveOrder } from "@/api/archiveOrder";
+import { setOrderStatus } from "@/api/setOrderStatus";
 import OrderFilesPanel from "./OrderFilesPanel";
 
 // Be compatible with either default or named exports
@@ -30,34 +31,36 @@ type OrderVM = {
   appointment_end?: string | null;
 };
 
+const STATUSES = ["new", "in_review", "completed", "cancelled"] as const;
+
 function fmtAddr(o: OrderVM) {
   const parts = [o.address, o.city, o.state].filter(Boolean);
   return parts.length ? parts.join(", ") : "No address";
 }
-
 function fmtDate(iso?: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
-  // show local date/time short
   return d.toLocaleString();
 }
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const orderId = id ?? "";
+
   const [order, setOrder] = useState<OrderVM | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-
-  const orderId = id ?? "";
+  const [savingStatus, setSavingStatus] = useState(false);
 
   const reload = async () => {
+    if (!orderId) return;
     setLoading(true);
     setErr(null);
     try {
-      // 1) Try the standard view (non-archived)
-      const data = await fetchOrder(orderId).catch(async () => {
-        // 2) If not found (e.g., archived), fall back to v_orders_all
+      // Try standard view (non-archived)
+      const primary = await fetchOrder(orderId).catch(async () => {
+        // Fallback to all-orders view (includes archived)
         const { data, error } = await supabase
           .from("v_orders_all")
           .select("*")
@@ -66,7 +69,7 @@ export default function OrderDetailPage() {
         if (error) throw error;
         return data as any;
       });
-      setOrder(data as OrderVM);
+      setOrder(primary as OrderVM);
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load order");
       setOrder(null);
@@ -76,7 +79,6 @@ export default function OrderDetailPage() {
   };
 
   useEffect(() => {
-    if (!orderId) return;
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -84,9 +86,7 @@ export default function OrderDetailPage() {
   const statusChip = useMemo(() => {
     if (!order) return null;
     return (
-      <span className="px-2 py-1 text-sm rounded bg-gray-200">
-        {order.status}
-      </span>
+      <span className="px-2 py-1 text-sm rounded bg-gray-200">{order.status}</span>
     );
   }, [order]);
 
@@ -95,9 +95,22 @@ export default function OrderDetailPage() {
     try {
       const next = !(order.is_archived ?? false);
       await archiveOrder(order.id, next);
-      await reload(); // reflect changes even if archived
+      await reload();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to toggle archive");
+    }
+  }
+
+  async function onChangeStatus(newStatus: OrderVM["status"]) {
+    if (!order) return;
+    setSavingStatus(true);
+    try {
+      await setOrderStatus({ orderId: order.id, newStatus });
+      await reload();
+    } catch (e: any) {
+      setErr(e?.message ?? "Failed to change status");
+    } finally {
+      setSavingStatus(false);
     }
   }
 
@@ -118,8 +131,19 @@ export default function OrderDetailPage() {
             <span className="mr-2"><strong>Due:</strong> {order.due_date ?? "—"}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {statusChip}
+          <select
+            className="border rounded px-2 py-1"
+            value={order.status}
+            disabled={savingStatus}
+            onChange={(e) => onChangeStatus(e.target.value as OrderVM["status"])}
+            title="Change status"
+          >
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
           <button
             className="px-2 py-1 border rounded"
             onClick={() => navigate(`/orders/${order.id}/appointment`)}
@@ -137,7 +161,7 @@ export default function OrderDetailPage() {
         </div>
       </header>
 
-      {/* Appointment summary (if any) */}
+      {/* Summary */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-1">
           <div><strong>Status:</strong> {order.status}</div>
@@ -152,14 +176,15 @@ export default function OrderDetailPage() {
         </div>
       </section>
 
-      {/* Timeline + Note composer */}
+      {/* Activity, notes, files */}
       <section className="space-y-4">
-  {ActivityTimeline ? <ActivityTimeline orderId={order.id} /> : null}
-  {NoteComposer ? <NoteComposer orderId={order.id} /> : null}
-  <OrderFilesPanel orderId={order.id} />
-</section>
+        {ActivityTimeline ? <ActivityTimeline orderId={order.id} /> : null}
+        {NoteComposer ? <NoteComposer orderId={order.id} /> : null}
+        <OrderFilesPanel orderId={order.id} />
+      </section>
     </div>
   );
 }
+
 
 
