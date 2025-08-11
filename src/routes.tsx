@@ -1,6 +1,7 @@
 // src/routes.tsx
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const OrdersListMvp        = lazy(() => import("@/features/orders-list/OrdersListMvp"));
 const OrderDetailPage      = lazy(() => import("@/features/order-detail/OrderDetailPage"));
@@ -25,24 +26,27 @@ function NotFound() {
 
 function AppRoutes() {
   return (
-    <Suspense fallback={<div className="p-6">Loading…</div>}>
-      <NotificationsHost />
-      <Routes>
-        <Route path="/" element={<Navigate to={ROUTES.orders} replace />} />
-        <Route path={ROUTES.orders} element={<OrdersListMvp />} />
-        <Route path={ROUTES.newOrder} element={<OrderCreatePage />} />
-        <Route path="/orders/:id" element={<OrderDetailPage />} />
-        <Route path="/orders/:id/appointment" element={<OrderAppointmentPage />} />
-        <Route path={ROUTES.reports} element={<ReportsPage />} />
-        <Route path={ROUTES.settings} element={<PreferencesPage />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<div className="p-6">Loading…</div>}>
+        <NotificationsHost />
+        <Routes>
+          <Route path="/" element={<Navigate to={ROUTES.orders} replace />} />
+          <Route path={ROUTES.orders} element={<OrdersListMvp />} />
+          <Route path={ROUTES.newOrder} element={<OrderCreatePage />} />
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
+          <Route path="/orders/:id/appointment" element={<OrderAppointmentPage />} />
+          <Route path={ROUTES.reports} element={<ReportsPage />} />
+          <Route path={ROUTES.settings} element={<PreferencesPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
 export default AppRoutes;
 export { AppRoutes };
+
 
 
 
