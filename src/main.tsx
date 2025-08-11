@@ -1,19 +1,14 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import "./index.css";
+import { Routes, Route } from "react-router-dom";
 
-function App() {
-  return <div style={{ padding: 16 }}>Router shell OK</div>;
+export default function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<div style={{ padding: 16 }}>Home OK</div>} />
+    </Routes>
+  );
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
-);
 
 
 
