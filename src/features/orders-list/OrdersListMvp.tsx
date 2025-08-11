@@ -1,12 +1,9 @@
-// src/features/orders-list/OrdersListMvp.tsx
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchOrders, type OrderFilters } from "@/api/fetchOrders";
 import type { OrderView } from "@/types/domain";
 import OrdersFilterBar from "./OrdersFilterBar";
-
-// Future-ready drawer + subpanels (all stubs provided in this PR)
 import OrderDrawer from "./components/OrderDrawer";
 
 type LoadState =
@@ -16,7 +13,7 @@ type LoadState =
 
 const DEFAULT_FILTERS: OrderFilters = {
   q: "",
-  status: undefined,     // e.g., ["new","in_review"]
+  status: undefined,
   assigneeId: null,
   clientId: null,
   includeArchived: false,
@@ -25,6 +22,12 @@ const DEFAULT_FILTERS: OrderFilters = {
   page: 1,
   pageSize: 50,
 };
+
+function toArray<T = unknown>(maybe: any): T[] {
+  if (Array.isArray(maybe)) return maybe as T[];
+  if (maybe && Array.isArray(maybe.data)) return maybe.data as T[];
+  return [];
+}
 
 export default function OrdersListMvp() {
   const [filters, setFilters] = useState<OrderFilters>(DEFAULT_FILTERS);
@@ -36,7 +39,7 @@ export default function OrdersListMvp() {
     setState({ phase: "loading" });
     try {
       const data = await fetchOrders(filters);
-      setRows(data ?? []);
+      setRows(toArray<OrderView>(data));
       setState({ phase: "ready" });
     } catch (e: any) {
       setRows([]);
@@ -44,15 +47,12 @@ export default function OrdersListMvp() {
     }
   }, [filters]);
 
-  // Initial + whenever filters change
   useEffect(() => { load(); }, [load]);
 
-  // Realtime refresh on changes to falcon_mvp.orders
   useEffect(() => {
     const ch = supabase
       .channel("orders_list_mvp")
       .on("postgres_changes", { event: "*", schema: "falcon_mvp", table: "orders" }, () => {
-        // Light debounce: only reload if we're already ready; otherwise allow current load to settle.
         if (state.phase === "ready") load();
       })
       .subscribe();
@@ -60,12 +60,12 @@ export default function OrdersListMvp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.phase, load]);
 
-  // Derived view for quick text search (client-side) layered on top of API filtering
   const filtered = useMemo(() => {
+    const base = Array.isArray(rows) ? rows : [];
     const needle = (filters.q ?? "").trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((o) =>
-      [o.id, o.title, o.status, o.address, o.client_display_name]
+    if (!needle) return base;
+    return base.filter((o) =>
+      [o.id, o.title, o.status, o.address, (o as any).client_display_name]
         .filter(Boolean)
         .some((x) => String(x).toLowerCase().includes(needle))
     );
@@ -97,7 +97,6 @@ export default function OrdersListMvp() {
         </div>
       </header>
 
-      {/* Unified filter bar (status, assignee, client, dates, includeArchived, q) */}
       <OrdersFilterBar value={filters} onChange={setFilters} />
 
       {state.phase === "error" && (
@@ -111,9 +110,6 @@ export default function OrdersListMvp() {
           }}
         >
           <strong>Error:</strong> {(state as any).message}
-          <div style={{ marginTop: 4, opacity: 0.8 }}>
-            Tip: ensure you’re signed in and RLS allows reading your org’s orders.
-          </div>
         </div>
       )}
 
@@ -136,12 +132,13 @@ export default function OrdersListMvp() {
                   <td colSpan={6} style={tdMuted}>Loading…</td>
                 </tr>
               )}
-              {state.phase !== "loading" && filtered.length === 0 && (
+              {state.phase !== "loading" && (!Array.isArray(filtered) || filtered.length === 0) && (
                 <tr>
                   <td colSpan={6} style={tdMuted}>No orders found.</td>
                 </tr>
               )}
               {state.phase !== "loading" &&
+                Array.isArray(filtered) &&
                 filtered.map((o) => (
                   <tr key={o.id} style={{ borderTop: "1px solid #f0f0f0" }}>
                     <td style={td}>
@@ -150,18 +147,16 @@ export default function OrdersListMvp() {
                         style={linkBtn}
                         title="Open details"
                       >
-                        {o.title || o.address || "(untitled)"}
-                        {o.is_archived ? " · (archived)" : ""}
+                        {o.title || (o as any).address || "(untitled)"}
+                        {(o as any).is_archived ? " · (archived)" : ""}
                       </button>
                     </td>
-                    <td style={td}>{o.client_display_name ?? "-"}</td>
+                    <td style={td}>{(o as any).client_display_name ?? "-"}</td>
                     <td style={td}>{o.status ?? "-"}</td>
-                    <td style={td}>{o.assignee_name ?? "—"}</td>
+                    <td style={td}>{(o as any).assignee_name ?? "—"}</td>
                     <td style={td}>{o.created_at ? new Date(o.created_at).toLocaleString() : "-"}</td>
                     <td style={{ ...td, textAlign: "right" }}>
-                      <Link to={`/orders/${o.id}`} style={smallLink}>
-                        Go to page →
-                      </Link>
+                      <Link to={`/orders/${o.id}`} style={smallLink}>Go to page →</Link>
                     </td>
                   </tr>
                 ))}
@@ -170,12 +165,10 @@ export default function OrdersListMvp() {
         </div>
       )}
 
-      {/* Drawer (future panels already wired) */}
       {selectedOrderId && (
         <OrderDrawer
           orderId={selectedOrderId}
           onClose={() => setSelectedOrderId(null)}
-          // Future-ready props (no-ops now, real handlers will be added later)
           onUpdated={() => load()}
         />
       )}
@@ -190,36 +183,15 @@ const th: React.CSSProperties = {
   borderBottom: "1px solid #eee",
   fontSize: 14,
 };
-
-const td: React.CSSProperties = {
-  padding: "10px 12px",
-  verticalAlign: "middle",
-  fontSize: 14,
-};
-
-const tdMuted: React.CSSProperties = {
-  ...td,
-  color: "#777",
-  textAlign: "center",
-};
-
+const td: React.CSSProperties = { padding: "10px 12px", verticalAlign: "middle", fontSize: 14 };
+const tdMuted: React.CSSProperties = { ...td, color: "#777", textAlign: "center" };
 const linkBtn: React.CSSProperties = {
-  padding: 0,
-  margin: 0,
-  border: "none",
-  background: "none",
-  textDecoration: "underline",
-  cursor: "pointer",
-  font: "inherit",
+  padding: 0, margin: 0, border: "none", background: "none", textDecoration: "underline", cursor: "pointer", font: "inherit",
+};
+const smallLink: React.CSSProperties = {
+  textDecoration: "none", border: "1px solid #ddd", padding: "4px 8px", borderRadius: 6, fontSize: 12,
 };
 
-const smallLink: React.CSSProperties = {
-  textDecoration: "none",
-  border: "1px solid #ddd",
-  padding: "4px 8px",
-  borderRadius: 6,
-  fontSize: 12,
-};
 
 
 
