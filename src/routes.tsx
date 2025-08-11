@@ -2,16 +2,16 @@
 import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-// Lazy-loaded pages (default exports expected)
 const OrdersListMvp   = lazy(() => import("@/features/orders-list/OrdersListMvp"));
 const OrderDetailPage = lazy(() => import("@/features/order-detail/OrderDetailPage"));
 const OrderCreatePage = lazy(() => import("@/features/order-create/OrderCreatePage"));
+const OrderAppointmentPage = lazy(() => import("@/features/order-appointment/OrderAppointmentPage"));
 
-// Optional route helpers for use elsewhere in the app
 export const ROUTES = {
   orders: "/orders",
   order: (id: string) => `/orders/${id}`,
   newOrder: "/orders/new",
+  appointment: (id: string) => `/orders/${id}/appointment`,
 };
 
 function NotFound() {
@@ -26,6 +26,7 @@ function AppRoutes() {
         <Route path={ROUTES.orders} element={<OrdersListMvp />} />
         <Route path={ROUTES.newOrder} element={<OrderCreatePage />} />
         <Route path="/orders/:id" element={<OrderDetailPage />} />
+        <Route path="/orders/:id/appointment" element={<OrderAppointmentPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
@@ -34,4 +35,5 @@ function AppRoutes() {
 
 export default AppRoutes;
 export { AppRoutes };
+
 
