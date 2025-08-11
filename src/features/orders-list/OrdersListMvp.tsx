@@ -1,153 +1,226 @@
 // src/features/orders-list/OrdersListMvp.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchOrders, type OrderFilters } from "@/api/fetchOrders";
+import type { OrderView } from "@/types/domain";
+import OrdersFilterBar from "./OrdersFilterBar";
 
-type OrderRow = {
-  id: string;
-  title: string | null;
-  status: string | null;
-  assigned_to: string | null;
-  is_archived: boolean;
-  created_at: string;
-  client_id: string | null;
+// Future-ready drawer + subpanels (all stubs provided in this PR)
+import OrderDrawer from "./components/OrderDrawer";
+
+type LoadState =
+  | { phase: "idle" | "loading" }
+  | { phase: "error"; message: string }
+  | { phase: "ready" };
+
+const DEFAULT_FILTERS: OrderFilters = {
+  q: "",
+  status: undefined,     // e.g., ["new","in_review"]
+  assigneeId: null,
+  clientId: null,
+  includeArchived: false,
+  dueFrom: null,
+  dueTo: null,
+  page: 1,
+  pageSize: 50,
 };
 
 export default function OrdersListMvp() {
-  const [orders, setOrders] = useState<OrderRow[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errMsg, setErrMsg] = useState<string | null>(null);
-  const [q, setQ] = useState("");
-  const [includeArchived, setIncludeArchived] = useState(false);
+  const [filters, setFilters] = useState<OrderFilters>(DEFAULT_FILTERS);
+  const [rows, setRows] = useState<OrderView[]>([]);
+  const [state, setState] = useState<LoadState>({ phase: "idle" });
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
-    setErrMsg(null);
-    const table = includeArchived ? "v_orders_all" : "v_orders";
-    const { data, error } = await supabase
-      .from<OrderRow>(table)
-      .select("id,title,status,assigned_to,is_archived,created_at,client_id")
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    if (error) {
-      setErrMsg(error.message);
-      setOrders([]);
-    } else {
-      setOrders(data ?? []);
+  const load = useCallback(async () => {
+    setState({ phase: "loading" });
+    try {
+      const data = await fetchOrders(filters);
+      setRows(data ?? []);
+      setState({ phase: "ready" });
+    } catch (e: any) {
+      setRows([]);
+      setState({ phase: "error", message: e?.message ?? "Failed to load orders" });
     }
-    setLoading(false);
-  }
+  }, [filters]);
 
+  // Initial + whenever filters change
+  useEffect(() => { load(); }, [load]);
+
+  // Realtime refresh on changes to falcon_mvp.orders
   useEffect(() => {
-    load();
+    const ch = supabase
+      .channel("orders_list_mvp")
+      .on("postgres_changes", { event: "*", schema: "falcon_mvp", table: "orders" }, () => {
+        // Light debounce: only reload if we're already ready; otherwise allow current load to settle.
+        if (state.phase === "ready") load();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includeArchived]);
+  }, [state.phase, load]);
 
+  // Derived view for quick text search (client-side) layered on top of API filtering
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return orders ?? [];
-    return (orders ?? []).filter((o) =>
-      [o.id, o.title, o.status]
+    const needle = (filters.q ?? "").trim().toLowerCase();
+    if (!needle) return rows;
+    return rows.filter((o) =>
+      [o.id, o.title, o.status, o.address, o.client_display_name]
         .filter(Boolean)
         .some((x) => String(x).toLowerCase().includes(needle))
     );
-  }, [orders, q]);
+  }, [rows, filters.q]);
 
   return (
-    <div style={{ padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
-      <h1 style={{ fontSize: 22, marginBottom: 12 }}>Orders</h1>
+    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1 style={{ margin: 0 }}>Orders</h1>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => load()}
+            disabled={state.phase === "loading"}
+            style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer" }}
+          >
+            {state.phase === "loading" ? "Loading…" : "Reload"}
+          </button>
+          <Link
+            to="/orders/new"
+            style={{
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #ddd",
+              textDecoration: "none",
+            }}
+          >
+            + New Order
+          </Link>
+        </div>
+      </header>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by id / title / status…"
-          style={{ flex: 1, padding: "8px 10px", border: "1px solid #ddd", borderRadius: 8 }}
-        />
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14 }}>
-          <input
-            type="checkbox"
-            checked={includeArchived}
-            onChange={(e) => setIncludeArchived(e.target.checked)}
-          />
-          Include archived
-        </label>
-        <button
-          onClick={load}
-          disabled={loading}
+      {/* Unified filter bar (status, assignee, client, dates, includeArchived, q) */}
+      <OrdersFilterBar value={filters} onChange={setFilters} />
+
+      {state.phase === "error" && (
+        <div
           style={{
-            padding: "8px 12px",
+            padding: 12,
             borderRadius: 8,
-            border: "1px solid #ddd",
-            background: loading ? "#f3f3f3" : "white",
-            cursor: loading ? "default" : "pointer",
+            background: "#fff3f3",
+            border: "1px solid #ffd0d0",
+            color: "#a40000",
           }}
         >
-          Reload
-        </button>
-      </div>
-
-      {loading && <div>Loading…</div>}
-
-      {!loading && errMsg && (
-        <div style={{ color: "#b00020", marginTop: 8 }}>
-          Error: {errMsg}
-          <div style={{ color: "#666", marginTop: 4, fontSize: 13 }}>
+          <strong>Error:</strong> {(state as any).message}
+          <div style={{ marginTop: 4, opacity: 0.8 }}>
             Tip: ensure you’re signed in and RLS allows reading your org’s orders.
           </div>
         </div>
       )}
 
-      {!loading && !errMsg && filtered.length === 0 && (
-        <div style={{ color: "#666" }}>No orders found.</div>
+      {state.phase !== "error" && (
+        <div style={{ border: "1px solid #eee", borderRadius: 10, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead style={{ background: "#fafafa" }}>
+              <tr>
+                <th style={th}>Title</th>
+                <th style={th}>Client</th>
+                <th style={th}>Status</th>
+                <th style={th}>Assigned To</th>
+                <th style={th}>Created</th>
+                <th style={th}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.phase === "loading" && (
+                <tr>
+                  <td colSpan={6} style={tdMuted}>Loading…</td>
+                </tr>
+              )}
+              {state.phase !== "loading" && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={tdMuted}>No orders found.</td>
+                </tr>
+              )}
+              {state.phase !== "loading" &&
+                filtered.map((o) => (
+                  <tr key={o.id} style={{ borderTop: "1px solid #f0f0f0" }}>
+                    <td style={td}>
+                      <button
+                        onClick={() => setSelectedOrderId(o.id)}
+                        style={linkBtn}
+                        title="Open details"
+                      >
+                        {o.title || o.address || "(untitled)"}
+                        {o.is_archived ? " · (archived)" : ""}
+                      </button>
+                    </td>
+                    <td style={td}>{o.client_display_name ?? "-"}</td>
+                    <td style={td}>{o.status ?? "-"}</td>
+                    <td style={td}>{o.assignee_name ?? "—"}</td>
+                    <td style={td}>{o.created_at ? new Date(o.created_at).toLocaleString() : "-"}</td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      <Link to={`/orders/${o.id}`} style={smallLink}>
+                        Go to page →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {!loading && !errMsg && filtered.length > 0 && (
-        <div style={{ border: "1px solid #eee", borderRadius: 10, overflow: "hidden" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "2fr 140px 160px 200px",
-              gap: 0,
-              padding: "10px 12px",
-              background: "#fafafa",
-              borderBottom: "1px solid #eee",
-              fontWeight: 600,
-              fontSize: 14,
-            }}
-          >
-            <div>Title</div>
-            <div>Status</div>
-            <div>Assigned To</div>
-            <div>Created</div>
-          </div>
-          {filtered.map((o) => (
-            <Link
-              key={o.id}
-              to={`/orders/${o.id}`}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "2fr 140px 160px 200px",
-                padding: "10px 12px",
-                textDecoration: "none",
-                color: "inherit",
-                borderBottom: "1px solid #f2f2f2",
-              }}
-            >
-              <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {o.title || "(untitled)"} {o.is_archived ? " · (archived)" : ""}
-              </div>
-              <div>{o.status ?? "-"}</div>
-              <div>{o.assigned_to ?? "-"}</div>
-              <div>{new Date(o.created_at).toLocaleString()}</div>
-            </Link>
-          ))}
-        </div>
+      {/* Drawer (future panels already wired) */}
+      {selectedOrderId && (
+        <OrderDrawer
+          orderId={selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+          // Future-ready props (no-ops now, real handlers will be added later)
+          onUpdated={() => load()}
+        />
       )}
     </div>
   );
 }
+
+const th: React.CSSProperties = {
+  textAlign: "left",
+  padding: "10px 12px",
+  fontWeight: 600,
+  borderBottom: "1px solid #eee",
+  fontSize: 14,
+};
+
+const td: React.CSSProperties = {
+  padding: "10px 12px",
+  verticalAlign: "middle",
+  fontSize: 14,
+};
+
+const tdMuted: React.CSSProperties = {
+  ...td,
+  color: "#777",
+  textAlign: "center",
+};
+
+const linkBtn: React.CSSProperties = {
+  padding: 0,
+  margin: 0,
+  border: "none",
+  background: "none",
+  textDecoration: "underline",
+  cursor: "pointer",
+  font: "inherit",
+};
+
+const smallLink: React.CSSProperties = {
+  textDecoration: "none",
+  border: "1px solid #ddd",
+  padding: "4px 8px",
+  borderRadius: 6,
+  fontSize: 12,
+};
+
 
 
 
