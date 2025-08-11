@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import ActivityTimeline from "./panels/ActivityTimeline";
 import OrderMap from "./panels/OrderMap";
 import NotesPanel from "./panels/NotesPanel";
+import AppointmentsPanel from "./panels/AppointmentsPanel";
 import { assignOrder } from "@/api/assignOrder";
 import { setOrderStatus } from "@/api/setOrderStatus";
 import { listUsers } from "@/api/listUsers";
@@ -12,10 +13,10 @@ import { listUsers } from "@/api/listUsers";
 type Props = {
   orderId: string;
   onClose: () => void;
-  onUpdated?: () => void; // call after actions
+  onUpdated?: () => void; // called after actions that mutate the order/activity
 };
 
-type TabKey = "timeline" | "map" | "notes";
+type TabKey = "timeline" | "map" | "notes" | "appointments";
 
 export default function OrderDrawer({ orderId, onClose, onUpdated }: Props) {
   const [tab, setTab] = useState<TabKey>("timeline");
@@ -81,14 +82,15 @@ export default function OrderDrawer({ orderId, onClose, onUpdated }: Props) {
         <div>
           <strong>Order {orderId}</strong>
           {order?.title ? <span style={{ marginLeft: 6, color: "#666" }}>· {order.title}</span> : null}
+          {order?.is_archived ? <span style={{ marginLeft: 6, color: "#a00" }}>· archived</span> : null}
         </div>
         <button onClick={onClose} style={closeBtn} title="Close">×</button>
       </div>
 
       {/* Quick actions */}
-      <div style={{ padding: 12, borderBottom: "1px solid #eee", display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={quickBar}>
         {/* Assign */}
-        <label style={{ fontSize: 12, color: "#666" }}>Assign:</label>
+        <label style={label}>Assign:</label>
         <select
           disabled={busy || loading}
           value={order?.assigned_to ?? ""}
@@ -102,7 +104,7 @@ export default function OrderDrawer({ orderId, onClose, onUpdated }: Props) {
         </select>
 
         {/* Status */}
-        <label style={{ fontSize: 12, color: "#666", marginLeft: 8 }}>Status:</label>
+        <label style={{ ...label, marginLeft: 8 }}>Status:</label>
         <select
           disabled={busy || loading}
           value={order?.status ?? "new"}
@@ -121,13 +123,15 @@ export default function OrderDrawer({ orderId, onClose, onUpdated }: Props) {
       {/* Tabs */}
       <div style={{ padding: 12, borderBottom: "1px solid #eee" }}>
         <nav style={{ display: "flex", gap: 8 }}>
-          {(["timeline","map","notes"] as TabKey[]).map(k => (
+          {(["timeline","map","notes","appointments"] as TabKey[]).map(k => (
             <button
               key={k}
               onClick={() => setTab(k)}
               style={tabBtn(k === tab)}
             >
-              {k === "timeline" ? "Activity" : k === "map" ? "Map" : "Notes"}
+              {k === "timeline" ? "Activity" :
+               k === "map" ? "Map" :
+               k === "notes" ? "Notes" : "Appointments"}
             </button>
           ))}
         </nav>
@@ -141,7 +145,17 @@ export default function OrderDrawer({ orderId, onClose, onUpdated }: Props) {
           <>
             {tab === "timeline" && <ActivityTimeline orderId={orderId} />}
             {tab === "map" && <OrderMap order={order} />}
-            {tab === "notes" && <NotesPanel orderId={orderId} onAdded={() => {/* Activity tab will auto-refresh */}} />}
+            {tab === "notes" && (
+              <NotesPanel
+                orderId={orderId}
+                onAdded={() => {
+                  // Activity panel will auto-refresh via realtime; we also refetch order for safety.
+                  load();
+                  onUpdated?.();
+                }}
+              />
+            )}
+            {tab === "appointments" && <AppointmentsPanel orderId={orderId} />}
           </>
         )}
       </div>
@@ -149,6 +163,7 @@ export default function OrderDrawer({ orderId, onClose, onUpdated }: Props) {
   );
 }
 
+/* styles */
 const drawer: React.CSSProperties = {
   position: "fixed",
   top: 0,
@@ -179,6 +194,17 @@ const closeBtn: React.CSSProperties = {
   cursor: "pointer",
 };
 
+const quickBar: React.CSSProperties = {
+  padding: 12,
+  borderBottom: "1px solid #eee",
+  display: "flex",
+  gap: 8,
+  alignItems: "center",
+  flexWrap: "wrap",
+};
+
+const label: React.CSSProperties = { fontSize: 12, color: "#666" };
+
 const select: React.CSSProperties = {
   border: "1px solid #ddd",
   borderRadius: 8,
@@ -194,4 +220,5 @@ const tabBtn = (active: boolean): React.CSSProperties => ({
   cursor: "pointer",
   textTransform: "capitalize",
 });
+
 
