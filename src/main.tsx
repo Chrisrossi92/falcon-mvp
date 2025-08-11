@@ -1,15 +1,12 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import "./index.css";
 
-const router = createBrowserRouter([
-  { path: "/", element: <div style={{ padding: 16 }}>Home OK</div> },
-]);
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <div style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
+    <h1>Hello Falcon</h1>
+    <p>If you see this, the app is mounting correctly.</p>
+  </div>
+);
 
-export default function AppRoutes() {
-  return (
-    <ErrorBoundary>
-      <RouterProvider router={router} />
-    </ErrorBoundary>
-  );
-}
 
