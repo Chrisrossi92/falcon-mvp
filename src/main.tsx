@@ -1,13 +1,17 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import AppRoutes from "./routes";
+import "./index.css";
 
-export default function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/" element={<div style={{ padding: 16 }}>Home OK</div>} />
-    </Routes>
-  );
-}
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  </React.StrictMode>
+);
+
 
 
 
