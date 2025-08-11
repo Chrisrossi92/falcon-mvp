@@ -8,8 +8,9 @@ const OrderDetailPage      = lazy(() => import("@/features/order-detail/OrderDet
 const OrderCreatePage      = lazy(() => import("@/features/order-create/OrderCreatePage"));
 const OrderAppointmentPage = lazy(() => import("@/features/order-appointment/OrderAppointmentPage"));
 const ReportsPage          = lazy(() => import("@/features/reports/ReportsPage"));
-const NotificationsHost    = lazy(() => import("@/features/notifications/NotificationsHost"));
 const PreferencesPage      = lazy(() => import("@/features/settings/PreferencesPage"));
+const NotificationsHost    = lazy(() => import("@/features/notifications/NotificationsHost"));
+const KanbanBoardPage      = lazy(() => import("@/features/kanban/KanbanBoardPage"));
 
 export const ROUTES = {
   orders: "/orders",
@@ -18,6 +19,7 @@ export const ROUTES = {
   appointment: (id: string) => `/orders/${id}/appointment`,
   reports: "/reports",
   settings: "/settings",
+  board: "/board",
 };
 
 function NotFound() {
@@ -37,6 +39,7 @@ function AppRoutes() {
           <Route path="/orders/:id/appointment" element={<OrderAppointmentPage />} />
           <Route path={ROUTES.reports} element={<ReportsPage />} />
           <Route path={ROUTES.settings} element={<PreferencesPage />} />
+          <Route path={ROUTES.board} element={<KanbanBoardPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
@@ -46,6 +49,7 @@ function AppRoutes() {
 
 export default AppRoutes;
 export { AppRoutes };
+
 
 
 
