@@ -1,18 +1,15 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import RoutesConfig from './routes';
-import './index.css';
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
-// Debug hooks (remove later)
-window.addEventListener("error", (e) => {
-  console.error("[window.error]", e.message, e.error?.stack);
-});
-window.addEventListener("unhandledrejection", (e) => {
-  console.error("[unhandledrejection]", e.reason);
-});
+const router = createBrowserRouter([
+  { path: "/", element: <div style={{ padding: 16 }}>Home OK</div> },
+]);
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <RoutesConfig />
-  </React.StrictMode>,
-);
+export default function AppRoutes() {
+  return (
+    <ErrorBoundary>
+      <RouterProvider router={router} />
+    </ErrorBoundary>
+  );
+}
+
