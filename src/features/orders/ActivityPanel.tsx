@@ -85,3 +85,25 @@ function label(
   return ev.event_type;
 }
 
+// live inserts
+useEffect(() => {
+  const channel = supabase
+    .channel(`order-activity-${orderId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'falcon_mvp',
+        table: 'order_activity',
+        filter: `order_id=eq.${orderId}`,
+      },
+      (payload) => {
+        setEvents((prev) => [payload.new as any, ...prev]);
+      }
+    )
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}, [orderId]);
+
+
