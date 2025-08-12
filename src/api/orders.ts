@@ -1,6 +1,4 @@
-// src/lib/api/orders.ts
-// Adjust the import path below to your actual client export.
-import { supabase } from "../supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 
 export async function createOrder(input: {
   organization_id: string;
@@ -9,20 +7,17 @@ export async function createOrder(input: {
   city: string;
   state: string;
   postal_code: string;
-  due_date?: string | null; // YYYY-MM-DD
+  due_date?: string | null;
 }) {
-  const { data, error } = await supabase.rpc(
-    "falcon_mvp.rpc_create_order",
-    {
-      p_organization_id: input.organization_id,
-      p_client_id: input.client_id,
-      p_address: input.address,
-      p_city: input.city,
-      p_state: input.state,
-      p_postal_code: input.postal_code,
-      p_due_date: input.due_date ?? null,
-    }
-  );
+  const { data, error } = await supabase.rpc("falcon_mvp.rpc_create_order", {
+    p_organization_id: input.organization_id,
+    p_client_id: input.client_id,
+    p_address: input.address,
+    p_city: input.city,
+    p_state: input.state,
+    p_postal_code: input.postal_code,
+    p_due_date: input.due_date ?? null,
+  });
   if (error) throw error;
   return data as string; // order_id
 }
@@ -56,4 +51,5 @@ export async function addOrderEvent(opts: {
   });
   if (error) throw error;
 }
+
 
