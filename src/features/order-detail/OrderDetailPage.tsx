@@ -96,6 +96,30 @@ function ActivityPanel({ orderId }: { orderId: string }) {
     };
   }, [orderId]);
 
+  // Live inserts via Supabase Realtime
+useEffect(() => {
+  const channel = supabase
+    .channel(`order-activity-${orderId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'falcon_mvp',
+        table: 'order_activity',
+        filter: `order_id=eq.${orderId}`,
+      },
+      (payload) => {
+        setEvents((prev) => [payload.new as any, ...prev]);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [orderId]);
+
+
   // Load users map for nicer labels
   useEffect(() => {
     (async () => {
