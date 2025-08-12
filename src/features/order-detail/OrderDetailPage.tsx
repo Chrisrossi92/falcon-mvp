@@ -7,7 +7,6 @@ import archiveOrder from "@/api/archiveOrder";
 import setOrderStatus from "@/api/setOrderStatus";
 import OrderFilesPanel from "./OrderFilesPanel";
 
-// ---------- Types ----------
 type OrderStatus = "new" | "in_review" | "completed" | "cancelled";
 
 type OrderVM = {
@@ -19,7 +18,7 @@ type OrderVM = {
   status: OrderStatus;
   client_name: string | null;
   assignee_name: string | null;
-  due_date: string | null; // YYYY-MM-DD
+  due_date: string | null;
   is_archived: boolean | null;
   appointment_start?: string | null;
   appointment_end?: string | null;
@@ -30,7 +29,7 @@ type OrderEventType = "created" | "assigned" | "status_changed" | "note_added";
 type OrderEvent = {
   id: number;
   order_id: string;
-  event_type: OrderEventType | string; // tolerate legacy types
+  event_type: OrderEventType | string;
   event_data: Record<string, unknown>;
   occurred_at: string;
   actor: string | null;
@@ -38,7 +37,12 @@ type OrderEvent = {
   kind: string | null;
 };
 
-// ---------- Helpers ----------
+async function getActorId() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) return null;
+  return data.user?.id ?? null;
+}
+
 function fmtWhen(iso: string) {
   try {
     return new Date(iso).toLocaleString();
@@ -60,12 +64,10 @@ function labelEvent(ev: OrderEvent, users: Record<string, string>) {
     case "note_added":
       return "Note added";
     default:
-      // fallback for any legacy/custom types
       return String(ev.event_type);
   }
 }
 
-// ---------- Embedded components ----------
 function ActivityPanel({ orderId }: { orderId: string }) {
   const [events, setEvents] = useState<OrderEvent[]>([]);
   const [users, setUsers] = useState<{ id: string; full_name: string | null }[]>(
@@ -96,29 +98,25 @@ function ActivityPanel({ orderId }: { orderId: string }) {
     };
   }, [orderId]);
 
-  // Live inserts via Supabase Realtime
-useEffect(() => {
-  const channel = supabase
-    .channel(`order-activity-${orderId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'falcon_mvp',
-        table: 'order_activity',
-        filter: `order_id=eq.${orderId}`,
-      },
-      (payload) => {
-        setEvents((prev) => [payload.new as any, ...prev]);
-      }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [orderId]);
-
+  // Live inserts (optional, turn Realtime ON in table settings)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`order-activity-${orderId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "falcon_mvp",
+          table: "order_activity",
+          filter: `order_id=eq.${orderId}`,
+        },
+        (payload) => setEvents((prev) => [payload.new as any, ...prev])
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId]);
 
   // Load users map for nicer labels
   useEffect(() => {
@@ -155,7 +153,13 @@ useEffect(() => {
   );
 }
 
-function AssignControl({ orderId, onAssigned }: { orderId: string; onAssigned?: () => void }) {
+function AssignControl({
+  orderId,
+  onAssigned,
+}: {
+  orderId: string;
+  onAssigned?: () => void;
+}) {
   const [users, setUsers] = useState<{ id: string; full_name: string | null }[]>(
     []
   );
@@ -177,17 +181,16 @@ function AssignControl({ orderId, onAssigned }: { orderId: string; onAssigned?: 
     if (!value) return;
     setSaving(true);
     setErr(null);
+    const actor = await getActorId();
     const { error } = await supabase.rpc("falcon_mvp.rpc_assign_order", {
       p_order_id: orderId,
       p_assigned_to: value,
       p_note: null,
+      p_actor: actor, // <-- pass actor
     });
     setSaving(false);
-    if (error) {
-      setErr(error.message);
-    } else {
-      onAssigned?.();
-    }
+    if (error) setErr(error.message);
+    else onAssigned?.();
   };
 
   return (
@@ -216,7 +219,6 @@ function AssignControl({ orderId, onAssigned }: { orderId: string; onAssigned?: 
   );
 }
 
-// ---------- Page ----------
 const OrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -257,13 +259,14 @@ const OrderDetailPage: React.FC = () => {
     setSavingStatus(true);
     try {
       await setOrderStatus(orderId, next);
-      // Optional: also log a status_changed event
+      const actor = await getActorId();
       await supabase.rpc("falcon_mvp.rpc_add_order_event", {
         p_order_id: orderId,
         p_event_type: "status_changed",
         p_event_data: { from: order.status, to: next },
         p_message: `Status changed: ${order.status} → ${next}`,
         p_kind: "status",
+        p_actor: actor, // <-- pass actor
       });
       await reload();
     } finally {
@@ -375,6 +378,7 @@ const OrderDetailPage: React.FC = () => {
 };
 
 export default OrderDetailPage;
+
 
 
 
