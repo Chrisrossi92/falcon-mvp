@@ -51,18 +51,26 @@ function fmtWhen(iso: string) {
   }
 }
 
-function labelEvent(ev: OrderEvent, users: Record<string, string>) {
+function labelEvent(
+  ev: OrderEvent,
+  users: Record<string, string>
+) {
   switch (ev.event_type) {
-    case "created":
+    case "order_created":
       return "Order created";
-    case "assigned": {
+    case "assigned_to_appraiser": {
       const to = (ev.event_data?.["assigned_to"] as string) ?? "";
       return `Assigned to ${users[to] ?? to ?? "user"}`;
     }
     case "status_changed":
       return "Status updated";
-    case "note_added":
+    case "user_note":
       return "Note added";
+    // backward-compat if any old rows exist
+    case "created":
+      return "Order created";
+    case "assigned":
+      return "Assigned";
     default:
       return String(ev.event_type);
   }
